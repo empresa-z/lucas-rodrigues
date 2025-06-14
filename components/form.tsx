@@ -27,8 +27,11 @@ const ContactForm: React.FC = () => {
 		e.preventDefault();
 		setStatus({ submitting: true, message: '', error: false });
 
-		// IMPORTANT: Replace this URL with your actual n8n webhook URL
-		const webhookUrl = 'https://n8n.promise.marketing/webhook/cbdbcfe2-0a70-45f9-92e3-caf5fa9654f1';
+		const webhookUrl = process.env.NEXT_PUBLIC_N8N_WEBHOOK_URL as string;
+		if (!webhookUrl) {
+			setStatus({ submitting: false, message: 'Webhook URL não configurada.', error: true });
+			return;
+		}
 
 		try {
 			const response = await fetch(webhookUrl, {
