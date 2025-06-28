@@ -26,18 +26,19 @@ export default function RootLayout({
   return (
     <html lang="pt-br">
       <Script
+        src="https://www.googletagmanager.com/gtag/js?id=AW-17200702425"
+        strategy="afterInteractive"
+      />
+      <Script
         id="google-ads"
         strategy="afterInteractive"
       >
-        {`<!-- Google tag (gtag.js) -->
- src="https://www.googletagmanager.com/gtag/js?id=AW-17200702425">
-
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', 'AW-17200702425');
-`}
+        {`
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', 'AW-17200702425');
+        `}
       </Script>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
