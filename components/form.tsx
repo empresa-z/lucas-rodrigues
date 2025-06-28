@@ -45,6 +45,10 @@ const ContactForm: React.FC = () => {
 			if (response.ok) {
 				setStatus({ submitting: false, message: 'Obrigado! Seus dados foram enviados com sucesso.', error: false });
 				setFormData({ name: '', email: '', phone: '', area: '' }); // Clear form
+				const areaMessage = formData.area
+					? `\n\nÁrea de interesse: ${formData.area}`
+					: '';
+				window.location.href = `https://wa.me/5521993254504?text=${encodeURIComponent(`Olá! Acabei de preencher o formulário. ${areaMessage}`)}`;
 			} else {
 				throw new Error('Falha no envio do formulário.');
 			}
