@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { submitContactForm } from '../app/actions/form-actions';
 import { useContactForm } from './hooks/useContactForm';
+import { useTracking } from './hooks/useTracking';
 import { WhatsAppRedirect } from './WhatsAppRedirect';
 
 const ContactForm: React.FC = () => {
@@ -13,13 +14,25 @@ const ContactForm: React.FC = () => {
 		submitForm,
 	} = useContactForm();
 
+	const { trackFormStart, trackFormSubmit, clientId } = useTracking();
 	const [shouldRedirect, setShouldRedirect] = useState(false);
+	const [hasTrackedFormStart, setHasTrackedFormStart] = useState(false);
 
-	const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+	// Track form start when user first interacts with form
+	const handleFirstInteraction = () => {
+		if (!hasTrackedFormStart) {
+			trackFormStart(); // Tracks with all enabled platforms (GA + Meta)
+			setHasTrackedFormStart(true);
+		}
+	}; const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
 
+		// Track form submission attempt with all platforms
+		trackFormSubmit(formData.area);
+
 		submitForm(async (data) => {
-			const result = await submitContactForm(data);
+			// Pass the client ID for server-side correlation
+			const result = await submitContactForm(data, clientId);
 			// Trigger WhatsApp redirect on successful submission
 			setShouldRedirect(true);
 			return result;
@@ -45,6 +58,7 @@ const ContactForm: React.FC = () => {
 							name="name"
 							value={formData.name}
 							onChange={handleInputChange}
+							onFocus={handleFirstInteraction}
 							required
 							className="mt-1 block w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
 						/>

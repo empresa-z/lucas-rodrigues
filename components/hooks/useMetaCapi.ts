@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 // Extend the Window interface to include fbq
 declare global {
@@ -19,7 +19,30 @@ interface CapiEventData {
 }
 
 export const useMetaCapi = () => {
-	const sendEvent = useCallback(async (eventData: CapiEventData) => {
+	const [clientId, setClientId] = useState<string>('');
+
+	// Generate and store client ID (correlate with GA)
+	useEffect(() => {
+		const storedClientId = localStorage.getItem('ga_client_id');
+		if (storedClientId) {
+			setClientId(storedClientId);
+		} else {
+			const newClientId = 'GA1.1.' + Math.random().toString(36).substring(2, 15) + '.' + Date.now();
+			localStorage.setItem('ga_client_id', newClientId);
+			setClientId(newClientId);
+		}
+	}, []);
+
+	// Send event to client-side Meta Pixel (via fbq)
+	const sendClientEvent = useCallback((eventData: CapiEventData) => {
+		if (typeof window !== 'undefined' && window.fbq) {
+			window.fbq('track', eventData.event_name, eventData.custom_data);
+			console.log('Meta client event sent:', eventData.event_name);
+		}
+	}, []);
+
+	// Send event to server-side Meta CAPI
+	const sendServerEvent = useCallback(async (eventData: CapiEventData) => {
 		try {
 			// Get Facebook pixel data if available
 			const fbp = typeof window !== 'undefined' && window.fbq ?
@@ -47,22 +70,40 @@ export const useMetaCapi = () => {
 				throw new Error(`CAPI request failed: ${response.statusText}`);
 			}
 
-			const result = await response.json();
-			return result;
+			console.log('Meta server event sent:', eventData.event_name);
 		} catch (error) {
-			console.error('Error sending CAPI event:', error);
-			throw error;
+			console.error('Error sending Meta server event:', error);
 		}
 	}, []);
 
-	const trackPageView = useCallback(() => {
-		return sendEvent({
-			event_name: 'PageView',
-		});
-	}, [sendEvent]);
+	// Send both client and server events (matching GA pattern)
+	const trackEvent = useCallback((eventData: CapiEventData) => {
+		// Send to client-side Meta Pixel
+		sendClientEvent(eventData);
 
-	const trackPurchase = useCallback((value: number, currency: string = 'USD', content_ids?: string[]) => {
-		return sendEvent({
+		// Send to server-side CAPI
+		if (clientId) {
+			sendServerEvent(eventData);
+		}
+	}, [sendClientEvent, sendServerEvent, clientId]);
+
+	// Track page view
+	const trackPageView = useCallback((pageUrl?: string, pageTitle?: string) => {
+		const url = pageUrl || window.location.href;
+		const title = pageTitle || document.title;
+
+		trackEvent({
+			event_name: 'PageView',
+			custom_data: {
+				page_location: url,
+				page_title: title,
+			},
+		});
+	}, [trackEvent]);
+
+	// Track purchase
+	const trackPurchase = useCallback((value: number, currency: string = 'BRL', content_ids?: string[]) => {
+		trackEvent({
 			event_name: 'Purchase',
 			custom_data: {
 				value,
@@ -70,17 +111,19 @@ export const useMetaCapi = () => {
 				content_ids: content_ids?.join(',') || '',
 			},
 		});
-	}, [sendEvent]);
+	}, [trackEvent]);
 
+	// Track lead conversion
 	const trackLead = useCallback((custom_data?: Record<string, string | number | boolean>) => {
-		return sendEvent({
+		trackEvent({
 			event_name: 'Lead',
 			custom_data,
 		});
-	}, [sendEvent]);
+	}, [trackEvent]);
 
-	const trackAddToCart = useCallback((value?: number, currency: string = 'USD', content_ids?: string[]) => {
-		return sendEvent({
+	// Track add to cart
+	const trackAddToCart = useCallback((value?: number, currency: string = 'BRL', content_ids?: string[]) => {
+		trackEvent({
 			event_name: 'AddToCart',
 			custom_data: {
 				value: value || 0,
@@ -88,14 +131,46 @@ export const useMetaCapi = () => {
 				content_ids: content_ids?.join(',') || '',
 			},
 		});
-	}, [sendEvent]);
+	}, [trackEvent]);
+
+	// Track form start (matching GA pattern)
+	const trackFormStart = useCallback(() => {
+		trackEvent({
+			event_name: 'InitiateCheckout', // Using Meta's equivalent funnel event
+			custom_data: {
+				currency: 'BRL',
+				value: 1,
+				form_name: 'contact_form',
+			},
+		});
+	}, [trackEvent]);
+
+	// Track form submission (matching GA pattern)
+	const trackFormSubmit = useCallback((area?: string) => {
+		trackEvent({
+			event_name: 'Lead',
+			custom_data: {
+				content_name: 'Contact Form Lead',
+				source: 'website',
+				content_category: area || 'General',
+				value: 1,
+				currency: 'BRL',
+				form_name: 'contact_form',
+			},
+		});
+	}, [trackEvent]);
 
 	return {
-		sendEvent,
+		clientId,
+		trackEvent,
 		trackPageView,
 		trackPurchase,
 		trackLead,
 		trackAddToCart,
+		trackFormStart,
+		trackFormSubmit,
+		sendClientEvent,
+		sendServerEvent,
 	};
 };
 
